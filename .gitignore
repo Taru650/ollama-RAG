@@ -2,7 +2,7 @@
 __pycache__/
 *.pyc
 chroma_db/
-data/letters/**/.meta/*.meta.auto.json
+**/.meta/*.meta.auto.json
 .env
 .pytest_cache/
 *.egg-info/

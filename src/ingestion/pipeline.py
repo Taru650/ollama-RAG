@@ -41,7 +41,14 @@ class LetterRecord:
 
 
 def _department_and_office_from_path(file_path: Path, data_root: Path) -> tuple[str, str]:
-    rel = file_path.relative_to(data_root)
+    try:
+        rel = file_path.resolve().relative_to(data_root.resolve())
+    except ValueError:
+        # file_path isn't under data_root -- e.g. inspect_letter.py run
+        # directly against an arbitrary file (a test fixture, or a
+        # letter not yet filed into data/letters/<department>/). Don't
+        # crash a QA tool over a path that's outside its own convention.
+        return "unknown", "unknown"
     parts = rel.parts
     department = parts[0] if len(parts) > 0 else "unknown"
     office = parts[1] if len(parts) > 2 else "unknown"
