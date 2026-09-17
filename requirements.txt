@@ -6,6 +6,8 @@ python-dotenv==1.0.1
 
 # Ingestion (optional formats)
 pymupdf==1.24.11
+pytesseract==0.3.13
+Pillow==12.3.0
 
 # Retrieval
 chromadb==0.5.20

@@ -21,6 +21,7 @@ from config.settings import settings
 from src.embeddings.factory import build_embedder
 from src.generation.ollama_client import OllamaChatClient
 from src.generation.prompt_builder import ReferenceLetter, build_messages
+from src.retrieval.department_detector import detect_department
 from src.retrieval.hybrid import HybridRetriever
 from src.store.chroma_store import ChromaLetterStore
 
@@ -39,7 +40,13 @@ def parse_facts(fact_args: list[str]) -> dict[str, str]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--request", required=True, help="Hindi description of the letter to draft")
-    parser.add_argument("--department", help="Filter retrieval to this department")
+    parser.add_argument(
+        "--department",
+        help="Filter retrieval to this department. If omitted, it's auto-detected "
+             "from your request text by seeing which department's letters the "
+             "request matches best; falls back to searching all departments if "
+             "no department clearly wins.",
+    )
     parser.add_argument("--letter-type", help="Filter retrieval to this letter type")
     parser.add_argument("--fact", action="append", help="key=value, repeatable")
     parser.add_argument("--top-k", type=int, default=settings.top_k)
@@ -53,8 +60,16 @@ def main() -> None:
     store = ChromaLetterStore(settings.chroma_dir, embedder.model_name, embedder.dimension())
     retriever = HybridRetriever(store, embedder)
 
+    department = args.department
+    if department is None:
+        department = detect_department(args.request, retriever)
+        if department:
+            print(f"Auto-detected department: {department} (pass --department to override)")
+        else:
+            print("Could not confidently auto-detect a department; searching all departments.")
+
     hits = retriever.retrieve(
-        args.request, top_k=args.top_k, department=args.department, letter_type=args.letter_type
+        args.request, top_k=args.top_k, department=department, letter_type=args.letter_type
     )
 
     if not hits:
@@ -73,7 +88,7 @@ def main() -> None:
 
     messages = build_messages(
         user_request=args.request,
-        department=args.department,
+        department=department,
         letter_type=args.letter_type,
         references=references,
         extra_facts=parse_facts(args.fact),

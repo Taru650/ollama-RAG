@@ -49,6 +49,9 @@ def main() -> None:
         print(f"reference: {r.metadata.get('reference_number')} / {r.metadata.get('reference_date')}")
         if r.low_confidence_fields:
             print(f"low-confidence fields: {r.low_confidence_fields}")
+        if r.needs_review:
+            print(f"** NEEDS REVIEW ** min_line_plausibility={r.min_line_plausibility:.2f} "
+                  f"(low legacy-font-decode confidence or, for a scanned PDF page, low OCR confidence)")
         print("-" * 70)
         print(r.text)
         print()

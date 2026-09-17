@@ -36,6 +36,18 @@ def main() -> None:
           f"(unfilled/unmatched) metadata field -- this is expected for "
           f"blank पत्रांक/दिनांक template placeholders, not necessarily an error.")
 
+    needs_review = [r for r in records if r.needs_review]
+    if needs_review:
+        print(f"{len(needs_review)} letters have low decode/OCR confidence and "
+              f"NEED MANUAL REVIEW before you trust them (likely a scanned page "
+              f"OCR struggled with, or an unrecognized legacy font):")
+        for r in needs_review[:20]:
+            print(f"  - {r.letter_id} (min_line_plausibility={r.min_line_plausibility:.2f}) "
+                  f"from {r.source_file}")
+        if len(needs_review) > 20:
+            print(f"  ... and {len(needs_review) - 20} more")
+        print("  Check these with: python scripts/inspect_letter.py --file <source_file> --all")
+
     print(f"Building embedder: backend={settings.embedding_backend} model={settings.embedding_model}")
     embedder = build_embedder(
         backend=settings.embedding_backend,

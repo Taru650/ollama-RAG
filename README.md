@@ -29,6 +29,17 @@ letters** (45 banking-cell forwarding letters concatenated in one
 the ~6 a quick visual skim would suggest. See
 `src/ingestion/segmentation.py` for how letter boundaries are detected.
 
+Many departments' letters exist only as scanned PDFs (no text layer at
+all), which is a different problem from legacy-font decoding: there's
+no encoding to fix, just pixels to read. `src/ingestion/pdf_loader.py`
+tries the text layer first and falls back to OCR
+(`src/ingestion/ocr.py`, Tesseract with the Hindi model) per page when
+the text layer is too sparse to be real. OCR confidence and
+legacy-font decode confidence share one audit signal
+(`LetterRecord.needs_review` / `min_line_plausibility`) so low-quality
+pages from either source get flagged the same way instead of two
+separate mechanisms to remember.
+
 ## Architecture
 
 ```
@@ -37,27 +48,43 @@ docx (raw XML) -> per-run rFonts capture -> legacy-font decode -> Unicode text
               -> cleaning -> regex metadata extraction (+ human override sidecar)
               -> embeddings (configurable backend) -> Chroma (local, persistent)
 
-USER REQUEST -> hybrid retrieval (department filter -> letter-type filter
+USER REQUEST -> department auto-detect (if not given explicitly)
+             -> hybrid retrieval (department filter -> letter-type filter
                                     -> BM25 keyword -> Chroma semantic -> RRF fuse)
              -> prompt builder (USER FACTS | RETRIEVED REFS [inert] | RULES)
              -> Ollama /api/chat (qwen3:1.7b) -> Hindi draft + references shown
 ```
 
+Department is a first-class filter, not just a metadata tag: letters
+already live under `data/letters/<department>/`, and when you ask for
+a letter without passing `--department` explicitly,
+`src/retrieval/department_detector.py` runs an unfiltered retrieval
+pass on your request text and checks whether one department clearly
+dominates the top hits. If so, generation is filtered to that
+department automatically (so an Education request draws on Education
+letters, not whatever happens to rank highest across every
+department); if no department clearly wins, it searches everything,
+same as if you'd passed no filter. This deliberately reuses the same
+hybrid retriever rather than a second keyword-list classifier, so
+"which department" and "which letters" never disagree with each
+other.
+
 ## Project layout
 
 ```
 config/settings.py           .env-driven configuration
-data/letters/<department>/<office>/*.docx   your letter corpus
-src/ingestion/                docx/pdf/txt loading, legacy-font normalizer, segmentation
+data/letters/<department>/<office>/*.{docx,pdf,txt}   your letter corpus
+src/ingestion/                docx/pdf/txt loading, legacy-font normalizer, OCR, segmentation
+src/ingestion/ocr.py          Tesseract OCR fallback for scanned/image-only PDF pages
 src/metadata/                 regex field extraction, human-override sidecars
 src/embeddings/                pluggable Embedder (Ollama or sentence-transformers)
 src/store/                    Chroma vector store wrapper
-src/retrieval/                hybrid (BM25 + semantic + RRF) retrieval
+src/retrieval/                hybrid (BM25 + semantic + RRF) retrieval, department auto-detection
 src/generation/                RAG prompt builder + Ollama chat client
 scripts/ingest.py             index data/letters/ into the vector store
 scripts/inspect_letter.py     print decoded text for manual QA
 scripts/generate.py           retrieve + draft a new letter
-tests/                        pytest suite, all model calls mocked/faked
+tests/                        pytest suite, all model calls mocked/faked (OCR tests self-skip if tesseract isn't installed)
 ```
 
 ## Install (on your own machine -- not this build environment)
@@ -77,11 +104,20 @@ ollama pull qwen3-embedding:0.6b
 #    pip install sentence-transformers, and set EMBEDDING_BACKEND=sentence_transformers
 #    in your .env (default already points at a small multilingual model).
 
-# 3. Python environment
+# 3. If you have scanned (image-only) PDF letters, install OCR support
+#    (Debian/Ubuntu; unlike Ollama, this WAS verified end-to-end in the
+#    build sandbox -- tesseract-ocr + tesseract-ocr-hin + a synthetic
+#    Hindi scan round-tripped through OCR exactly correctly there):
+sudo apt-get install -y tesseract-ocr tesseract-ocr-hin
+# If your letters are only .docx (no scanned PDFs), you can skip this --
+# ingestion works fine without a tesseract binary present, it just
+# can't fall back to OCR on a page with no text layer.
+
+# 4. Python environment
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-# 4. Config
+# 5. Config
 cp .env.example .env
 # edit .env if you changed the embedding backend/model above
 ```
@@ -96,12 +132,17 @@ python scripts/ingest.py
 # further -- read the printed Devanagari and confirm it isn't garbled.
 python scripts/inspect_letter.py --file data/letters/district_administration/banking_cell/banking_cell_forwarding_letters.docx --all
 
-# Draft a new letter
+# Draft a new letter -- --department is optional now; omit it and the
+# system auto-detects the department from your request text
 python scripts/generate.py \
   --request "बैंक ऋण योजना समीक्षा के संबंध में जिला बैंकिंग कोषांग को पत्र तैयार करें।" \
-  --department district_administration \
   --fact "शाखा=उदाहरण बैंक शाखा"
 ```
+
+`scripts/ingest.py` prints a list of letters flagged `needs_review`
+(low legacy-font-decode confidence or, for a scanned PDF page, low OCR
+confidence) -- check those with `inspect_letter.py` before trusting
+them in retrieval.
 
 Expect CPU-only generation on this hardware to take tens of seconds
 per letter -- this was not benchmarked from the build sandbox, so
@@ -173,6 +214,22 @@ against the two real sample letters committed in `data/letters/`.
 5. **Real-hardware performance is unbenchmarked.** Qwen3 1.7B +
    an embedding model + Chroma resident on 8GB RAM/CPU-only was never
    run together in the build sandbox.
+6. **OCR was validated on a synthetic scan, not a real one.** No real
+   scanned PDF letter was available to test against -- the OCR path
+   (`src/ingestion/ocr.py`) was verified with a Hindi phrase rendered
+   to an image and PDF in-sandbox, which confirms the plumbing and
+   the confidence-scoring works, but real scans (skewed, low-DPI,
+   handwritten annotations, poor photocopies) will be harder and are
+   untested. Always check the `needs_review` flags after ingesting
+   real scans.
+7. **Department auto-detection is unproven at scale.** It's tested
+   against small synthetic corpora with clearly department-distinct
+   vocabulary; with only two real departments actually in the corpus
+   right now, it hasn't been exercised on real ambiguous cases (e.g.
+   two departments both legitimately writing about "भूमि" or "बैठक").
+   It always degrades safely to "search everything" rather than guess
+   wrong, but that's a design choice being asserted, not yet observed
+   against a large real corpus.
 
 ## What's not built yet
 
