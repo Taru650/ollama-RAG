@@ -1,0 +1,22 @@
+# Core
+python-docx==1.1.2
+lxml==5.3.0
+pydantic==2.9.2
+python-dotenv==1.0.1
+
+# Ingestion (optional formats)
+pymupdf==1.24.11
+
+# Retrieval
+chromadb==0.5.20
+rank-bm25==0.2.2
+
+# Embeddings (sentence-transformers backend; skip if using EMBEDDING_BACKEND=ollama)
+sentence-transformers==3.2.1
+
+# Generation (Ollama HTTP client)
+requests==2.32.3
+
+# Tests
+pytest==8.3.3
+requests-mock==1.12.1

@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+"""Ingest all letters under DATA_DIR into the local Chroma vector store.
+
+Usage:
+    python scripts/ingest.py
+"""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from config.settings import settings
+from src.embeddings.factory import build_embedder
+from src.ingestion.pipeline import ingest_directory
+from src.store.chroma_store import ChromaLetterStore
+
+
+def main() -> None:
+    data_root = Path(settings.data_dir)
+    if not data_root.exists():
+        print(f"Data directory not found: {data_root}")
+        sys.exit(1)
+
+    print(f"Scanning {data_root} ...")
+    records = ingest_directory(data_root)
+    print(f"Found {len(records)} letters after segmentation.")
+
+    if not records:
+        print("Nothing to ingest.")
+        return
+
+    low_confidence = [r for r in records if r.low_confidence_fields]
+    print(f"{len(low_confidence)} letters have at least one low-confidence "
+          f"(unfilled/unmatched) metadata field -- this is expected for "
+          f"blank पत्रांक/दिनांक template placeholders, not necessarily an error.")
+
+    print(f"Building embedder: backend={settings.embedding_backend} model={settings.embedding_model}")
+    embedder = build_embedder(
+        backend=settings.embedding_backend,
+        model_name=settings.embedding_model,
+        ollama_host=settings.ollama_host,
+    )
+    dimension = embedder.dimension()
+    print(f"Embedding dimension: {dimension}")
+
+    store = ChromaLetterStore(settings.chroma_dir, embedder.model_name, dimension)
+
+    texts = [r.text for r in records]
+    print("Computing embeddings (this can take a while on CPU)...")
+    embeddings = embedder.embed(texts)
+
+    ids = [r.letter_id for r in records]
+    metadatas = []
+    for r in records:
+        meta = dict(r.metadata)
+        # Chroma metadata values must be str/int/float/bool -- drop
+        # non-scalar fields (e.g. copy_to list, field_confidence dict)
+        # from the filterable metadata; the full text still carries them.
+        meta = {k: v for k, v in meta.items() if isinstance(v, (str, int, float, bool))}
+        meta["letter_id"] = r.letter_id
+        metadatas.append(meta)
+
+    store.add_letters(ids, embeddings, texts, metadatas)
+    print(f"Ingested {store.count()} letters into {settings.chroma_dir}")
+
+
+if __name__ == "__main__":
+    main()
