@@ -107,12 +107,14 @@ run end-to-end with a real model here. Pick the section for your OS.
 # 1. Install Ollama, then pull the generation model
 ollama pull qwen3:1.7b
 
-# 2. Pull an embedding model. qwen3-embedding:0.6b's availability on
-#    Ollama was NOT verified from the build sandbox -- try this first:
+# 2. Pull the embedding model (default EMBEDDING_BACKEND=ollama uses this):
 ollama pull qwen3-embedding:0.6b
-#    If that fails, use the sentence-transformers fallback instead:
-#    pip install sentence-transformers, and set EMBEDDING_BACKEND=sentence_transformers
-#    in your .env (default already points at a small multilingual model).
+#    If that's unavailable, use the sentence-transformers fallback
+#    instead: pip install sentence-transformers, and set
+#    EMBEDDING_BACKEND=sentence_transformers + EMBEDDING_MODEL to a
+#    HuggingFace model name (e.g. intfloat/multilingual-e5-small) in
+#    your .env. Not installed by default -- it pulls in torch and
+#    scikit-learn, both with compiled native extensions.
 
 # 3. If you have scanned (image-only) PDF letters, install OCR support
 #    (Debian/Ubuntu; unlike Ollama, this WAS verified end-to-end in the
@@ -179,9 +181,15 @@ winget install --id Python.Python.3.11 -e
 # 2. Install Ollama (https://ollama.com/download/windows), then:
 ollama pull qwen3:1.7b
 ollama pull qwen3-embedding:0.6b
-#    If that embedding pull fails, use the sentence-transformers
-#    fallback instead: pip install sentence-transformers, and set
-#    EMBEDDING_BACKEND=sentence_transformers in your .env.
+#    (default EMBEDDING_BACKEND=ollama uses this -- confirmed working
+#    end-to-end on Windows during this project's own testing). If
+#    that's unavailable, the sentence-transformers fallback is NOT
+#    recommended on Windows: it pulls in torch and scikit-learn, and
+#    scikit-learn's compiled Cython extension has been confirmed
+#    blocked by Windows Smart App Control on at least one real
+#    machine (the same failure mode as chromadb's gRPC DLL -- see
+#    above). Try disabling Smart App Control, or WSL2, before falling
+#    back to it on Windows.
 
 # 3. If you have scanned (image-only) PDF letters, install Tesseract
 #    OCR with the Hindi language pack (UB-Mannheim installer is the
@@ -330,9 +338,18 @@ against the two real sample letters committed in `data/letters/`.
    files (45 + 1 = 46 letters, matching a full read-through) but hasn't
    been tested against a third format.
 4. **Embedding model availability.** `qwen3-embedding:0.6b` on Ollama
-   is unverified from the build sandbox; `EMBEDDING_BACKEND` is
-   pluggable specifically so you can fall back to
-   `sentence-transformers` without a code change.
+   was unverified from the build sandbox but has since been confirmed
+   pullable (`ollama pull qwen3-embedding:0.6b`) on a real Windows
+   machine. `EMBEDDING_BACKEND=ollama` is the default for this reason:
+   it's a pure HTTP call to your Ollama server with no local ML
+   library and nothing for Windows Smart App Control/WDAC to block.
+   `EMBEDDING_BACKEND` is still pluggable if you'd rather use
+   `sentence-transformers` (not installed by default -- see
+   requirements.txt), but that backend pulls in torch and
+   scikit-learn, both of which ship compiled native extensions and hit
+   the same class of Smart App Control block as chromadb did (see
+   "Windows" install section above) on at least one real machine this
+   project was tested against.
 5. **Real-hardware performance is unbenchmarked.** Qwen3 1.7B +
    an embedding model + the local vector store resident on 8GB
    RAM/CPU-only was never run together in the build sandbox.

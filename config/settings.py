@@ -19,8 +19,8 @@ class Settings:
     ollama_host: str = _env("OLLAMA_HOST", "http://localhost:11434")
     ollama_model: str = _env("OLLAMA_MODEL", "qwen3:1.7b")
 
-    embedding_backend: str = _env("EMBEDDING_BACKEND", "sentence_transformers")
-    embedding_model: str = _env("EMBEDDING_MODEL", "intfloat/multilingual-e5-small")
+    embedding_backend: str = _env("EMBEDDING_BACKEND", "ollama")
+    embedding_model: str = _env("EMBEDDING_MODEL", "qwen3-embedding:0.6b")
 
     top_k: int = int(_env("TOP_K", "5"))
 
