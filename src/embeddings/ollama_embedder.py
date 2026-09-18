@@ -1,15 +1,24 @@
 """Embeddings via a local Ollama server's /api/embeddings endpoint.
 
 Availability of a given embedding model (e.g. qwen3-embedding:0.6b) on
-Ollama is unverified from the build environment -- verify locally with
-``ollama pull <model>`` before relying on this backend; fall back to
-the sentence_transformers backend otherwise (see config/settings.py).
+Ollama is now confirmed working end-to-end, including on a real
+CPU-only Windows machine (this project's target hardware profile) --
+see config/settings.py for the "ollama" vs "sentence_transformers"
+backend choice.
 """
 from __future__ import annotations
 
 import requests
 
 from .base import Embedder
+
+# The first call after the Ollama server starts (or after its
+# keep_alive window expires) has to load the model from disk into
+# RAM before it can respond -- on an 8GB CPU-only machine this project
+# targets, that cold load plus per-token compute can genuinely exceed
+# a minute. A short timeout here doesn't make ingestion faster, it
+# just turns a slow-but-working call into a crash.
+_REQUEST_TIMEOUT_SECONDS = 300
 
 
 class OllamaEmbedder(Embedder):
@@ -25,7 +34,7 @@ class OllamaEmbedder(Embedder):
             resp = self._session.post(
                 f"{self._host}/api/embeddings",
                 json={"model": self.model_name, "prompt": text},
-                timeout=120,
+                timeout=_REQUEST_TIMEOUT_SECONDS,
             )
             resp.raise_for_status()
             vector = resp.json()["embedding"]
