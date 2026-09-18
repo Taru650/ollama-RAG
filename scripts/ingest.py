@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from config.settings import settings
 from src.embeddings.factory import build_embedder
+from src.ingestion.indexing import index_records
 from src.ingestion.pipeline import ingest_directory
 from src.store.chroma_store import ChromaLetterStore
 
@@ -59,22 +60,8 @@ def main() -> None:
 
     store = ChromaLetterStore(settings.chroma_dir, embedder.model_name, dimension)
 
-    texts = [r.text for r in records]
     print("Computing embeddings (this can take a while on CPU)...")
-    embeddings = embedder.embed(texts)
-
-    ids = [r.letter_id for r in records]
-    metadatas = []
-    for r in records:
-        meta = dict(r.metadata)
-        # Chroma metadata values must be str/int/float/bool -- drop
-        # non-scalar fields (e.g. copy_to list, field_confidence dict)
-        # from the filterable metadata; the full text still carries them.
-        meta = {k: v for k, v in meta.items() if isinstance(v, (str, int, float, bool))}
-        meta["letter_id"] = r.letter_id
-        metadatas.append(meta)
-
-    store.add_letters(ids, embeddings, texts, metadatas)
+    index_records(records, store, embedder)
     print(f"Ingested {store.count()} letters into {settings.chroma_dir}")
 
 

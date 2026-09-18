@@ -62,7 +62,14 @@ def _letter_id(file_path: Path, segment_index: int) -> str:
 
 def _metadata_paths(file_path: Path, segment_index: int) -> tuple[Path, Path]:
     letter_id = _letter_id(file_path, segment_index)
-    meta_dir = file_path.parent / ".meta"
+    return metadata_sidecar_paths(file_path, letter_id)
+
+
+def metadata_sidecar_paths(source_file: Path, letter_id: str) -> tuple[Path, Path]:
+    """Public: (auto_path, override_path) for a letter_id, given its
+    source file. Used by the admin API, which has letter_id + source_file
+    from Chroma metadata rather than a fresh segment_index."""
+    meta_dir = source_file.parent / ".meta"
     return meta_dir / f"{letter_id}.meta.auto.json", meta_dir / f"{letter_id}.meta.json"
 
 

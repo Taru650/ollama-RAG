@@ -5,10 +5,13 @@ letters from a corpus of real Hindi government correspondence and
 drafts a new one with Ollama + Qwen3 1.7B. Built for an 8GB RAM,
 no-GPU laptop (Intel i7-8550U) -- everything here runs CPU-only.
 
-This is **Phases 1-6** of a larger planned system: ingestion through
-RAG generation. A web UI, DOCX/PDF export, an admin panel, and
-optional LoRA fine-tuning are deliberately out of scope for this pass
-(see "What's not built yet" below).
+This covers ingestion through RAG generation, a local web UI (FastAPI)
+for drafting and downloading letters, DOCX/PDF export, and an
+admin/data-management page for uploading, reviewing, correcting, and
+deleting corpus documents. Optional LoRA fine-tuning is still out of
+scope (see "What's not built yet" below) -- per the original project
+plan, RAG comes first, and fine-tuning is only worth doing if
+evaluation later shows RAG alone isn't enough.
 
 ## Why this isn't a simple text-extraction pipeline
 
@@ -76,15 +79,20 @@ config/settings.py           .env-driven configuration
 data/letters/<department>/<office>/*.{docx,pdf,txt}   your letter corpus
 src/ingestion/                docx/pdf/txt loading, legacy-font normalizer, OCR, segmentation
 src/ingestion/ocr.py          Tesseract OCR fallback for scanned/image-only PDF pages
+src/ingestion/indexing.py     shared LetterRecord -> Chroma logic (used by CLI and web app alike)
 src/metadata/                 regex field extraction, human-override sidecars
 src/embeddings/                pluggable Embedder (Ollama or sentence-transformers)
 src/store/                    Chroma vector store wrapper
 src/retrieval/                hybrid (BM25 + semantic + RRF) retrieval, department auto-detection
 src/generation/                RAG prompt builder + Ollama chat client
+src/export/                    DOCX rendering + DOCX->PDF via headless LibreOffice
+app/                            FastAPI app: routers (generate/catalog/export/admin), dependencies, schemas
+static/                         plain HTML/CSS/JS frontend (no build step, no CDN -- offline-first)
 scripts/ingest.py             index data/letters/ into the vector store
 scripts/inspect_letter.py     print decoded text for manual QA
-scripts/generate.py           retrieve + draft a new letter
-tests/                        pytest suite, all model calls mocked/faked (OCR tests self-skip if tesseract isn't installed)
+scripts/generate.py           retrieve + draft a new letter (CLI)
+scripts/run_web.py             start the web app
+tests/                        pytest suite, all model calls mocked/faked (OCR/PDF tests self-skip if the system deps aren't installed)
 ```
 
 ## Install (on your own machine -- not this build environment)
@@ -112,6 +120,23 @@ sudo apt-get install -y tesseract-ocr tesseract-ocr-hin
 # If your letters are only .docx (no scanned PDFs), you can skip this --
 # ingestion works fine without a tesseract binary present, it just
 # can't fall back to OCR on a page with no text layer.
+
+# 3b. For PDF export, install LibreOffice Writer specifically -- NOT
+#     just `libreoffice` or `libreoffice-core`, which have no document
+#     filters at all and fail to even load a .docx (found and fixed
+#     during this project's own build: `soffice --convert-to pdf`
+#     silently errored with "source file could not be loaded" until
+#     libreoffice-writer was installed). Also verified end-to-end here
+#     -- generated a real letter, converted it, and visually confirmed
+#     correct Devanagari conjunct/matra shaping in the output PDF.
+sudo apt-get install -y libreoffice-writer
+# A Devanagari font also needs to be installed for the PDF to render
+# correctly (not just be present as text) -- Noto Sans Devanagari
+# (this project's default, DOCX_FONT_NAME in .env) or Windows' Nirmala
+# UI/Mangal work too if already installed:
+sudo apt-get install -y fonts-noto-core
+# Skip 3b entirely if you only need DOCX export -- that has no
+# external dependency beyond python-docx.
 
 # 4. Python environment
 python3 -m venv .venv && source .venv/bin/activate
@@ -154,6 +179,37 @@ from your own corpus, the font-name-to-mapping-table logic in
 new font name added, or (if it's a genuinely different legacy
 encoding, not Kruti Dev/DevLys-compatible) a new mapping table --
 `kru2uni.py` was validated only against Kruti Dev/DevLys-family fonts.
+
+## Web UI
+
+```bash
+python scripts/run_web.py
+# then open http://127.0.0.1:8000/  (letter drafting)
+#      and http://127.0.0.1:8000/admin.html  (data management)
+```
+
+The generation page lets you pick a department (or leave it blank for
+auto-detection), enter your request and any known facts, generate a
+draft, edit it inline, and download it as `.docx` or `.pdf`. The admin
+page lists every source document with its segment count and how many
+segments are flagged `needs_review`, lets you upload a new file
+(assigning department/office), view a document's extracted text per
+letter, correct a letter's department/type/subject (writes the same
+`.meta.json` sidecar the CLI respects), delete a whole document (file
++ its index entries) or just drop one bad segment from the index
+without touching its source file, search across everything, and
+rebuild the whole index from disk.
+
+No frontend build step and no CDN dependencies (fonts, JS, CSS are all
+served locally) -- matches the project's local/offline-first
+requirement; the browser renders Devanagari using whatever font is
+actually installed on your machine (`DOCX_FONT_NAME` in `.env`
+controls the *export* font specifically, independent of what the
+browser picks for on-screen display).
+
+The server starts and serves both pages even without a running Ollama
+server -- only `POST /api/generate` needs one; browsing/uploading/
+editing the corpus doesn't.
 
 ## Adding your own letters
 
@@ -230,10 +286,26 @@ against the two real sample letters committed in `data/letters/`.
    It always degrades safely to "search everything" rather than guess
    wrong, but that's a design choice being asserted, not yet observed
    against a large real corpus.
+8. **Web UI end-to-end generation flow is untested with a real model.**
+   The FastAPI app, its routes, and both pages were tested with a real
+   browser (Playwright) and a real uploaded/ingested/deleted document
+   round-trip through the actual admin API -- but `POST /api/generate`
+   itself was only exercised with a faked Ollama response (same
+   constraint as the CLI: no live Ollama server reachable from the
+   build sandbox). DOCX and PDF export *were* verified with real
+   output files, including visually confirming correct Devanagari
+   rendering in the PDF.
+9. **No auth on the web UI.** It binds to `127.0.0.1` by default
+   (`WEB_HOST` in `.env`) for local-machine use. If you expose it on a
+   network, put it behind your own auth/reverse proxy first -- nothing
+   here does that for you.
+10. **Admin delete is real deletion.** "Delete document" removes the
+    source file from disk and its entries from the index; there's a
+    browser confirm dialog but no undo. "Delete letter" (one segment)
+    only touches the index, not the source file.
 
 ## What's not built yet
 
-Web UI (FastAPI), DOCX/PDF export, the admin/data-management page, and
-LoRA/QLoRA fine-tuning are all out of scope for this pass -- per the
-original project plan, RAG comes first, and those are separate,
-later phases.
+Optional LoRA/QLoRA fine-tuning is the only piece still out of scope --
+per the original project plan, RAG comes first, and fine-tuning is
+only worth pursuing if evaluation later shows RAG alone falls short.

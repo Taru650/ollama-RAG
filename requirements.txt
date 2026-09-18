@@ -19,6 +19,16 @@ sentence-transformers==3.2.1
 # Generation (Ollama HTTP client)
 requests==2.32.3
 
+# Export (DOCX built directly; PDF needs the soffice binary on PATH --
+# see README for the libreoffice-writer system package)
+# (docx export reuses python-docx above)
+
+# Web UI (FastAPI)
+fastapi==0.141.1
+uvicorn==0.53.0
+python-multipart==0.0.32
+
 # Tests
 pytest==8.3.3
 requests-mock==1.12.1
+httpx==0.28.1

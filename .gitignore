@@ -6,3 +6,4 @@ chroma_db/
 .env
 .pytest_cache/
 *.egg-info/
+tmp_exports/

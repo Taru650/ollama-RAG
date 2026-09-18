@@ -69,6 +69,28 @@ class ChromaLetterStore:
         """Return all documents matching a metadata filter (no vector search)."""
         return self._collection.get(where=where or None)
 
+    def get_by_ids(self, ids: list[str]) -> dict:
+        if not ids:
+            return {"ids": [], "documents": [], "metadatas": []}
+        return self._collection.get(ids=ids)
+
+    def delete_by_ids(self, ids: list[str]) -> None:
+        if ids:
+            self._collection.delete(ids=ids)
+
+    def delete_by_filter(self, where: dict) -> None:
+        self._collection.delete(where=where)
+
+    def list_distinct(self, field: str) -> list[str]:
+        """Distinct values of a metadata field actually present in the
+        store -- e.g. departments -- rather than a hardcoded list."""
+        all_docs = self.get_by_filter(None)
+        values = {
+            meta.get(field) for meta in all_docs.get("metadatas", [])
+            if meta and meta.get(field)
+        }
+        return sorted(values)
+
     def query(
         self,
         query_embedding: list[float],
