@@ -1,9 +1,9 @@
 """Hybrid retrieval: department filter -> letter-type filter -> BM25
-keyword scoring -> Chroma semantic similarity -> reciprocal rank fusion.
+keyword scoring -> vector-store semantic similarity -> reciprocal rank fusion.
 
 Both the keyword and semantic passes run over the *same*
-department/letter-type-filtered candidate set (fetched from Chroma via
-a metadata-only `where` query), so filtering always takes priority
+department/letter-type-filtered candidate set (fetched from the store
+via a metadata-only `where` filter), so filtering always takes priority
 over similarity -- an Education-department request should never surface
 a Revenue letter just because it scores higher semantically.
 
@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from rank_bm25 import BM25Okapi
 
 from src.embeddings.base import Embedder
-from src.store.chroma_store import ChromaLetterStore
+from src.store.vector_store import LocalVectorStore
 
 _TOKEN_RE = re.compile(r"\w+", re.UNICODE)
 _RRF_K = 60
@@ -39,20 +39,16 @@ class RetrievedLetter:
 
 
 def _build_where(department: str | None, letter_type: str | None) -> dict | None:
-    clauses = []
+    where = {}
     if department:
-        clauses.append({"department": department})
+        where["department"] = department
     if letter_type:
-        clauses.append({"letter_type": letter_type})
-    if not clauses:
-        return None
-    if len(clauses) == 1:
-        return clauses[0]
-    return {"$and": clauses}
+        where["letter_type"] = letter_type
+    return where or None
 
 
 class HybridRetriever:
-    def __init__(self, store: ChromaLetterStore, embedder: Embedder):
+    def __init__(self, store: LocalVectorStore, embedder: Embedder):
         self._store = store
         self._embedder = embedder
 

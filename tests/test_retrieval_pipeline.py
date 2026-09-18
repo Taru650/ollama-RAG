@@ -5,7 +5,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.retrieval.hybrid import HybridRetriever
-from src.store.chroma_store import ChromaLetterStore
+from src.store.vector_store import LocalVectorStore
 from tests.fakes import FakeEmbedder
 
 LETTERS = [
@@ -18,7 +18,7 @@ LETTERS = [
 
 def _build_store_and_retriever(tmp_path: Path):
     embedder = FakeEmbedder()
-    store = ChromaLetterStore(tmp_path, embedder.model_name, embedder.dimension())
+    store = LocalVectorStore(tmp_path, embedder.model_name, embedder.dimension())
     ids = [l[0] for l in LETTERS]
     texts = [l[1] for l in LETTERS]
     metas = [{"department": l[2], "letter_type": l[3]} for l in LETTERS]

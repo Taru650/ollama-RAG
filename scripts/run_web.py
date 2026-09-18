@@ -17,6 +17,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from scripts._console import ensure_utf8_console
+
+ensure_utf8_console()
+
 import uvicorn
 
 from config.settings import settings

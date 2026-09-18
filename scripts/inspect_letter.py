@@ -19,6 +19,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from scripts._console import ensure_utf8_console
+
+ensure_utf8_console()
+
 from config.settings import settings
 from src.ingestion.pipeline import ingest_file
 

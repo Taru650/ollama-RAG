@@ -35,14 +35,30 @@ class PdfConversionFailed(RuntimeError):
     pass
 
 
+# The Windows LibreOffice installer does NOT add soffice.exe to PATH
+# by default (unlike `apt install libreoffice-writer` on Linux), so
+# shutil.which alone misses a perfectly good install on most Windows
+# machines. Check the standard install locations as a fallback.
+_WINDOWS_SOFFICE_CANDIDATES = (
+    r"C:\Program Files\LibreOffice\program\soffice.exe",
+    r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+)
+
+
 def _soffice_binary() -> str:
     binary = shutil.which("soffice") or shutil.which("libreoffice")
-    if not binary:
-        raise PdfExportUnavailable(
-            "soffice/libreoffice not found on PATH. Install libreoffice-writer "
-            "(see README) to enable PDF export; DOCX export still works without it."
-        )
-    return binary
+    if binary:
+        return binary
+    for candidate in _WINDOWS_SOFFICE_CANDIDATES:
+        if Path(candidate).exists():
+            return candidate
+    raise PdfExportUnavailable(
+        "soffice/libreoffice not found on PATH (and not in the usual Windows "
+        "install location). Install LibreOffice -- on Windows the standard "
+        "installer is enough (no PATH setup needed, this checks its default "
+        "install location too); on Linux install libreoffice-writer "
+        "specifically (see README). DOCX export still works without it."
+    )
 
 
 def render_letter_pdf(
@@ -73,7 +89,7 @@ def render_letter_pdf(
         result = subprocess.run(
             [
                 binary, "--headless", "--norestore",
-                f"-env:UserInstallation=file://{profile_dir}",
+                f"-env:UserInstallation={profile_dir.as_uri()}",
                 "--convert-to", "pdf",
                 "--outdir", str(work_path),
                 str(docx_path),

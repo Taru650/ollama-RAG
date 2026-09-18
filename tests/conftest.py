@@ -19,26 +19,26 @@ from app.dependencies import get_embedder, get_ollama_client, get_retriever, get
 from app.main import app
 from config.settings import settings
 from src.retrieval.hybrid import HybridRetriever
-from src.store.chroma_store import ChromaLetterStore
+from src.store.vector_store import LocalVectorStore
 from tests.fakes import FakeEmbedder, FakeOllamaChatClient
 
-SETTINGS_OVERRIDE_FIELDS = ("data_dir", "chroma_dir", "export_tmp_dir")
+SETTINGS_OVERRIDE_FIELDS = ("data_dir", "vector_store_dir", "export_tmp_dir")
 
 
 @pytest.fixture
 def api_client(tmp_path: Path):
     data_dir = tmp_path / "data" / "letters"
-    chroma_dir = tmp_path / "chroma_db"
+    vector_store_dir = tmp_path / "vector_store"
     export_dir = tmp_path / "tmp_exports"
     data_dir.mkdir(parents=True)
 
     originals = {field: getattr(settings, field) for field in SETTINGS_OVERRIDE_FIELDS}
     object.__setattr__(settings, "data_dir", data_dir)
-    object.__setattr__(settings, "chroma_dir", chroma_dir)
+    object.__setattr__(settings, "vector_store_dir", vector_store_dir)
     object.__setattr__(settings, "export_tmp_dir", export_dir)
 
     embedder = FakeEmbedder()
-    store = ChromaLetterStore(chroma_dir, embedder.model_name, embedder.dimension())
+    store = LocalVectorStore(vector_store_dir, embedder.model_name, embedder.dimension())
     retriever = HybridRetriever(store, embedder)
     ollama_client = FakeOllamaChatClient()
 

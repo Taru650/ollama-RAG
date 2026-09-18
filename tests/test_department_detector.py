@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.retrieval.department_detector import detect_department
 from src.retrieval.hybrid import HybridRetriever
-from src.store.chroma_store import ChromaLetterStore
+from src.store.vector_store import LocalVectorStore
 from tests.fakes import FakeEmbedder
 
 LETTERS = [
@@ -22,7 +22,7 @@ LETTERS = [
 
 def _build_retriever(tmp_path: Path) -> HybridRetriever:
     embedder = FakeEmbedder()
-    store = ChromaLetterStore(tmp_path, embedder.model_name, embedder.dimension())
+    store = LocalVectorStore(tmp_path, embedder.model_name, embedder.dimension())
     ids = [l[0] for l in LETTERS]
     texts = [l[1] for l in LETTERS]
     metas = [{"department": l[2], "letter_type": l[3]} for l in LETTERS]
@@ -52,6 +52,6 @@ def test_ambiguous_query_returns_none(tmp_path: Path):
 
 def test_no_letters_in_store_returns_none(tmp_path: Path):
     embedder = FakeEmbedder()
-    store = ChromaLetterStore(tmp_path, embedder.model_name, embedder.dimension())
+    store = LocalVectorStore(tmp_path, embedder.model_name, embedder.dimension())
     retriever = HybridRetriever(store, embedder)
     assert detect_department("कोई भी अनुरोध", retriever) is None

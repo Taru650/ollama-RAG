@@ -29,7 +29,7 @@ from src.ingestion.pipeline import (
     ingest_directory, ingest_file, metadata_sidecar_paths,
 )
 from src.retrieval.hybrid import HybridRetriever
-from src.store.chroma_store import ChromaLetterStore
+from src.store.vector_store import LocalVectorStore
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -99,7 +99,7 @@ def get_document(doc_id: str):
 
 
 @router.delete("/documents/{doc_id}")
-def delete_document(doc_id: str, store: ChromaLetterStore = Depends(get_store)):
+def delete_document(doc_id: str, store: LocalVectorStore = Depends(get_store)):
     data_root = Path(settings.data_dir)
     try:
         file_path = decode_doc_id(doc_id, data_root)
@@ -124,7 +124,7 @@ def upload_document(
     file: UploadFile = File(...),
     department: str = Form(...),
     office: str = Form(...),
-    store: ChromaLetterStore = Depends(get_store),
+    store: LocalVectorStore = Depends(get_store),
     embedder: Embedder = Depends(get_embedder),
 ):
     _validate_slug(department, "department")
@@ -154,7 +154,7 @@ def upload_document(
 
 @router.post("/reindex", response_model=IngestSummary)
 def reindex(
-    store: ChromaLetterStore = Depends(get_store),
+    store: LocalVectorStore = Depends(get_store),
     embedder: Embedder = Depends(get_embedder),
 ):
     data_root = Path(settings.data_dir)
@@ -167,7 +167,7 @@ def reindex(
 # ------------------------------------------------------------------ letters
 
 @router.get("/letters", response_model=list[LetterSummary])
-def list_letters(department: str | None = None, store: ChromaLetterStore = Depends(get_store)):
+def list_letters(department: str | None = None, store: LocalVectorStore = Depends(get_store)):
     where = {"department": department} if department else None
     result = store.get_by_filter(where)
     return [
@@ -182,7 +182,7 @@ def list_letters(department: str | None = None, store: ChromaLetterStore = Depen
 
 
 @router.delete("/letters/{letter_id}")
-def delete_letter(letter_id: str, store: ChromaLetterStore = Depends(get_store)):
+def delete_letter(letter_id: str, store: LocalVectorStore = Depends(get_store)):
     existing = store.get_by_ids([letter_id])
     if not existing.get("ids"):
         raise HTTPException(status_code=404, detail="Letter not found in index")
@@ -194,7 +194,7 @@ def delete_letter(letter_id: str, store: ChromaLetterStore = Depends(get_store))
 def update_letter_metadata(
     letter_id: str,
     overrides: MetadataOverride,
-    store: ChromaLetterStore = Depends(get_store),
+    store: LocalVectorStore = Depends(get_store),
     embedder: Embedder = Depends(get_embedder),
 ):
     existing = store.get_by_ids([letter_id])

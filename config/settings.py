@@ -24,7 +24,7 @@ class Settings:
 
     top_k: int = int(_env("TOP_K", "5"))
 
-    chroma_dir: Path = Path(_env("CHROMA_DIR", "./chroma_db"))
+    vector_store_dir: Path = Path(_env("VECTOR_STORE_DIR", "./vector_store"))
     data_dir: Path = Path(_env("DATA_DIR", "./data/letters"))
 
     generation_temperature: float = float(_env("GENERATION_TEMPERATURE", "0.2"))

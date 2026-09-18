@@ -9,8 +9,16 @@ pymupdf==1.24.11
 pytesseract==0.3.13
 Pillow==12.3.0
 
-# Retrieval
-chromadb==0.5.20
+# Retrieval -- local vector store is pure Python + numpy (see
+# src/store/vector_store.py), deliberately not chromadb: chromadb's
+# dependency tree (chroma-hnswlib, a C extension with spotty prebuilt
+# Windows wheel coverage; opentelemetry's gRPC exporter, which
+# unconditionally imports a native DLL that Windows Application
+# Control/Smart App Control blocks on a stock machine even with
+# telemetry disabled) caused real, unrecoverable install failures on
+# Windows during this project's own testing. numpy has solid prebuilt
+# wheels everywhere and needs no OS-level security exception.
+numpy==2.4.6
 rank-bm25==0.2.2
 
 # Embeddings (sentence-transformers backend; skip if using EMBEDDING_BACKEND=ollama)

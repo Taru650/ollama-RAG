@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ingest all letters under DATA_DIR into the local Chroma vector store.
+"""Ingest all letters under DATA_DIR into the local vector store.
 
 Usage:
     python scripts/ingest.py
@@ -11,11 +11,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from scripts._console import ensure_utf8_console
+
+ensure_utf8_console()
+
 from config.settings import settings
 from src.embeddings.factory import build_embedder
 from src.ingestion.indexing import index_records
 from src.ingestion.pipeline import ingest_directory
-from src.store.chroma_store import ChromaLetterStore
+from src.store.vector_store import LocalVectorStore
 
 
 def main() -> None:
@@ -58,11 +62,11 @@ def main() -> None:
     dimension = embedder.dimension()
     print(f"Embedding dimension: {dimension}")
 
-    store = ChromaLetterStore(settings.chroma_dir, embedder.model_name, dimension)
+    store = LocalVectorStore(settings.vector_store_dir, embedder.model_name, dimension)
 
     print("Computing embeddings (this can take a while on CPU)...")
     index_records(records, store, embedder)
-    print(f"Ingested {store.count()} letters into {settings.chroma_dir}")
+    print(f"Ingested {store.count()} letters into {settings.vector_store_dir}")
 
 
 if __name__ == "__main__":

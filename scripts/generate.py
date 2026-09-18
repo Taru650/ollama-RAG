@@ -17,13 +17,17 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from scripts._console import ensure_utf8_console
+
+ensure_utf8_console()
+
 from config.settings import settings
 from src.embeddings.factory import build_embedder
 from src.generation.ollama_client import OllamaChatClient
 from src.generation.prompt_builder import ReferenceLetter, build_messages
 from src.retrieval.department_detector import detect_department
 from src.retrieval.hybrid import HybridRetriever
-from src.store.chroma_store import ChromaLetterStore
+from src.store.vector_store import LocalVectorStore
 
 
 def parse_facts(fact_args: list[str]) -> dict[str, str]:
@@ -57,7 +61,7 @@ def main() -> None:
         model_name=settings.embedding_model,
         ollama_host=settings.ollama_host,
     )
-    store = ChromaLetterStore(settings.chroma_dir, embedder.model_name, embedder.dimension())
+    store = LocalVectorStore(settings.vector_store_dir, embedder.model_name, embedder.dimension())
     retriever = HybridRetriever(store, embedder)
 
     department = args.department

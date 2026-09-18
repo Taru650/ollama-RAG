@@ -20,7 +20,7 @@ from src.embeddings.base import Embedder
 from src.embeddings.factory import build_embedder
 from src.generation.ollama_client import OllamaChatClient
 from src.retrieval.hybrid import HybridRetriever
-from src.store.chroma_store import ChromaLetterStore
+from src.store.vector_store import LocalVectorStore
 
 
 @lru_cache
@@ -33,9 +33,9 @@ def get_embedder() -> Embedder:
 
 
 @lru_cache
-def get_store() -> ChromaLetterStore:
+def get_store() -> LocalVectorStore:
     embedder = get_embedder()
-    return ChromaLetterStore(settings.chroma_dir, embedder.model_name, embedder.dimension())
+    return LocalVectorStore(settings.vector_store_dir, embedder.model_name, embedder.dimension())
 
 
 @lru_cache

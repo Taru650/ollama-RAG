@@ -49,11 +49,11 @@ separate mechanisms to remember.
 docx (raw XML) -> per-run rFonts capture -> legacy-font decode -> Unicode text
               -> letter-boundary segmentation
               -> cleaning -> regex metadata extraction (+ human override sidecar)
-              -> embeddings (configurable backend) -> Chroma (local, persistent)
+              -> embeddings (configurable backend) -> local vector store (pure Python + numpy, persistent)
 
 USER REQUEST -> department auto-detect (if not given explicitly)
              -> hybrid retrieval (department filter -> letter-type filter
-                                    -> BM25 keyword -> Chroma semantic -> RRF fuse)
+                                    -> BM25 keyword -> vector-store semantic -> RRF fuse)
              -> prompt builder (USER FACTS | RETRIEVED REFS [inert] | RULES)
              -> Ollama /api/chat (qwen3:1.7b) -> Hindi draft + references shown
 ```
@@ -79,10 +79,10 @@ config/settings.py           .env-driven configuration
 data/letters/<department>/<office>/*.{docx,pdf,txt}   your letter corpus
 src/ingestion/                docx/pdf/txt loading, legacy-font normalizer, OCR, segmentation
 src/ingestion/ocr.py          Tesseract OCR fallback for scanned/image-only PDF pages
-src/ingestion/indexing.py     shared LetterRecord -> Chroma logic (used by CLI and web app alike)
+src/ingestion/indexing.py     shared LetterRecord -> vector store logic (used by CLI and web app alike)
 src/metadata/                 regex field extraction, human-override sidecars
 src/embeddings/                pluggable Embedder (Ollama or sentence-transformers)
-src/store/                    Chroma vector store wrapper
+src/store/                    local vector store (pure Python + numpy, no native extensions)
 src/retrieval/                hybrid (BM25 + semantic + RRF) retrieval, department auto-detection
 src/generation/                RAG prompt builder + Ollama chat client
 src/export/                    DOCX rendering + DOCX->PDF via headless LibreOffice
@@ -97,9 +97,11 @@ tests/                        pytest suite, all model calls mocked/faked (OCR/PD
 
 ## Install (on your own machine -- not this build environment)
 
-This repo was built and tested in a sandbox with no network access to
-ollama.com or huggingface.co, so the steps below were never run
-end-to-end with a real model here. Do this on your actual 8GB laptop:
+This repo was built and tested in a Linux sandbox with no network
+access to ollama.com or huggingface.co, so the steps below were never
+run end-to-end with a real model here. Pick the section for your OS.
+
+### Linux / macOS
 
 ```bash
 # 1. Install Ollama, then pull the generation model
@@ -146,6 +148,70 @@ pip install -r requirements.txt
 cp .env.example .env
 # edit .env if you changed the embedding backend/model above
 ```
+
+### Windows
+
+Native Windows support needed two real fixes beyond "just run the
+Linux steps," both applied in this repo, not left as workarounds you
+have to remember:
+
+- The vector store is pure Python + numpy (`src/store/vector_store.py`),
+  not ChromaDB. ChromaDB's dependency tree (`chroma-hnswlib`, a C
+  extension with spotty prebuilt Windows wheel coverage requiring MSVC
+  Build Tools to build from source; opentelemetry's gRPC exporter,
+  which unconditionally loads a native DLL that Windows Application
+  Control / Smart App Control blocks on a stock machine even with
+  telemetry disabled) caused unrecoverable install/import failures
+  during this project's own Windows testing. numpy has solid prebuilt
+  wheels everywhere and needs no OS-level security exception.
+- PDF export (`src/export/pdf_export.py`) now finds `soffice.exe` even
+  when the LibreOffice installer didn't add it to PATH (checks the
+  default `C:\Program Files\LibreOffice\...` locations), and builds
+  its temporary-profile URI with `Path.as_uri()` instead of manual
+  string concatenation, so it works correctly even when your project
+  path contains spaces (e.g. `C:\Projects\ollama rag letters\...`).
+
+```powershell
+# 1. Install Python 3.11+ (Python 3.14 currently lacks prebuilt wheels
+#    for some dependencies on Windows). If `py -3.11` doesn't find one:
+winget install --id Python.Python.3.11 -e
+
+# 2. Install Ollama (https://ollama.com/download/windows), then:
+ollama pull qwen3:1.7b
+ollama pull qwen3-embedding:0.6b
+#    If that embedding pull fails, use the sentence-transformers
+#    fallback instead: pip install sentence-transformers, and set
+#    EMBEDDING_BACKEND=sentence_transformers in your .env.
+
+# 3. If you have scanned (image-only) PDF letters, install Tesseract
+#    OCR with the Hindi language pack (UB-Mannheim installer is the
+#    common choice: https://github.com/UB-Mannheim/tesseract/wiki).
+#    Make sure "Hindi" is checked in the installer's language list, or
+#    ingestion will fall back to English-only OCR on scanned pages.
+#    Skip this if your letters are only .docx (no scanned PDFs).
+
+# 3b. For PDF export, install LibreOffice
+#     (https://www.libreoffice.org/download/) with the default
+#     components (Writer included). It doesn't need to be on PATH --
+#     this project checks the standard install locations automatically.
+#     Skip this entirely if you only need DOCX export.
+
+# 4. Python environment
+py -3.11 -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+
+# 5. Config
+copy .env.example .env
+# edit .env if you changed the embedding backend/model above
+```
+
+Hindi text printed to a plain `cmd.exe`/PowerShell console can raise
+`UnicodeEncodeError` on Windows' legacy code-page default; every
+script under `scripts/` forces UTF-8 console I/O on startup
+(`scripts/_console.py`) so this shouldn't come up, but if you see it
+from your own code, `sys.stdout.reconfigure(encoding="utf-8")` is the
+fix.
 
 ## Run
 
@@ -268,8 +334,8 @@ against the two real sample letters committed in `data/letters/`.
    pluggable specifically so you can fall back to
    `sentence-transformers` without a code change.
 5. **Real-hardware performance is unbenchmarked.** Qwen3 1.7B +
-   an embedding model + Chroma resident on 8GB RAM/CPU-only was never
-   run together in the build sandbox.
+   an embedding model + the local vector store resident on 8GB
+   RAM/CPU-only was never run together in the build sandbox.
 6. **OCR was validated on a synthetic scan, not a real one.** No real
    scanned PDF letter was available to test against -- the OCR path
    (`src/ingestion/ocr.py`) was verified with a Hindi phrase rendered
