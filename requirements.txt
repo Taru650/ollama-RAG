@@ -1,0 +1,49 @@
+# Core
+python-docx==1.1.2
+lxml==5.3.0
+pydantic==2.9.2
+python-dotenv==1.0.1
+
+# Ingestion (optional formats)
+pymupdf==1.24.11
+pytesseract==0.3.13
+Pillow==12.3.0
+
+# Retrieval -- local vector store is pure Python + numpy (see
+# src/store/vector_store.py), deliberately not chromadb: chromadb's
+# dependency tree (chroma-hnswlib, a C extension with spotty prebuilt
+# Windows wheel coverage; opentelemetry's gRPC exporter, which
+# unconditionally imports a native DLL that Windows Application
+# Control/Smart App Control blocks on a stock machine even with
+# telemetry disabled) caused real, unrecoverable install failures on
+# Windows during this project's own testing. numpy has solid prebuilt
+# wheels everywhere and needs no OS-level security exception.
+numpy==2.4.6
+rank-bm25==0.2.2
+
+# Embeddings (default backend: EMBEDDING_BACKEND=ollama, requests
+# below is all it needs). sentence-transformers is an OPT-IN fallback
+# for EMBEDDING_BACKEND=sentence_transformers only -- it pulls in
+# torch and scikit-learn, both of which ship compiled/Cython native
+# extensions that Windows Smart App Control/WDAC may block on a
+# locked-down machine (the same failure mode as chromadb's gRPC DLL,
+# see the vector-store note above). Install it yourself if you need
+# this backend:
+#   pip install sentence-transformers==3.2.1
+
+# Generation (Ollama HTTP client)
+requests==2.32.3
+
+# Export (DOCX built directly; PDF needs the soffice binary on PATH --
+# see README for the libreoffice-writer system package)
+# (docx export reuses python-docx above)
+
+# Web UI (FastAPI)
+fastapi==0.141.1
+uvicorn==0.53.0
+python-multipart==0.0.32
+
+# Tests
+pytest==8.3.3
+requests-mock==1.12.1
+httpx==0.28.1

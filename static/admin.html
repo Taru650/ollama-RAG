@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>प्रशासन - हिंदी पत्र सहायक</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>प्रशासन / डेटा प्रबंधन</h1>
+    <nav><a href="/index.html">पत्र तैयार करें</a></nav>
+  </header>
+
+  <main style="display:block; max-width:1100px;">
+    <section class="panel" style="margin-bottom:20px;">
+      <h2>नया दस्तावेज़ अपलोड करें</h2>
+      <form id="upload-form" class="inline">
+        <div>
+          <label for="upload-file">फ़ाइल (.docx / .pdf / .txt)</label>
+          <input type="file" id="upload-file" accept=".docx,.pdf,.txt" required>
+        </div>
+        <div>
+          <label for="upload-department">विभाग</label>
+          <input type="text" id="upload-department" list="dept-list" placeholder="जैसे: education" required>
+          <datalist id="dept-list"></datalist>
+        </div>
+        <div>
+          <label for="upload-office">कार्यालय</label>
+          <input type="text" id="upload-office" placeholder="जैसे: district_office" required>
+        </div>
+        <div style="flex:0 0 auto;">
+          <button type="submit" class="btn-primary" id="upload-btn">अपलोड करें</button>
+        </div>
+      </form>
+      <div class="error" id="upload-error" hidden></div>
+      <div class="notice" id="upload-success" hidden></div>
+    </section>
+
+    <section class="panel" style="margin-bottom:20px;">
+      <h2>खोजें</h2>
+      <form class="inline" id="search-form">
+        <div>
+          <input type="text" id="search-query" placeholder="कीवर्ड खोजें...">
+        </div>
+        <div style="flex:0 0 auto;">
+          <button type="submit">खोजें</button>
+        </div>
+      </form>
+      <div id="search-results"></div>
+    </section>
+
+    <section class="panel">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h2 style="margin:0;">दस्तावेज़ सूची</h2>
+        <button id="reindex-btn">🔄 पूरा इंडेक्स फिर से बनाएँ</button>
+      </div>
+      <div class="notice" id="reindex-status" hidden></div>
+      <table id="documents-table">
+        <thead>
+          <tr><th>फ़ाइल</th><th>विभाग / कार्यालय</th><th>खंड</th><th>समीक्षा आवश्यक</th><th>क्रियाएँ</th></tr>
+        </thead>
+        <tbody id="documents-tbody"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="/admin.js"></script>
+</body>
+</html>

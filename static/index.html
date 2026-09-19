@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>हिंदी पत्र सहायक</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>हिंदी सरकारी पत्र सहायक</h1>
+    <nav><a href="/admin.html">प्रशासन / डेटा प्रबंधन</a></nav>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>नया पत्र तैयार करें</h2>
+      <form id="generate-form">
+        <label for="department">विभाग (खाली छोड़ने पर स्वतः पहचाना जाएगा)</label>
+        <select id="department"><option value="">-- स्वतः पहचान --</option></select>
+
+        <label for="letter-type">पत्र प्रकार (वैकल्पिक)</label>
+        <select id="letter-type"><option value="">-- कोई भी --</option></select>
+
+        <label for="request">अनुरोध</label>
+        <textarea id="request" placeholder="उदाहरण: शिक्षकों की कमी के संबंध में जिला शिक्षा पदाधिकारी को पत्र तैयार करें।" required></textarea>
+
+        <label>अतिरिक्त तथ्य (वैकल्पिक)</label>
+        <div id="facts-container"></div>
+        <button type="button" id="add-fact">+ तथ्य जोड़ें</button>
+
+        <div class="actions">
+          <button type="submit" class="btn-primary" id="generate-btn">पत्र तैयार करें</button>
+          <span class="spinner" id="spinner" hidden>तैयार हो रहा है... (CPU पर एक मिनट तक लग सकता है)</span>
+        </div>
+        <div class="error" id="generate-error" hidden></div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>प्रारूप</h2>
+      <div id="auto-detect-notice" class="notice" hidden></div>
+      <textarea id="draft-output" placeholder="यहाँ तैयार पत्र दिखेगा..."></textarea>
+      <div class="actions">
+        <button id="copy-btn" disabled>कॉपी करें</button>
+        <button id="download-docx-btn" disabled>DOCX डाउनलोड करें</button>
+        <button id="download-pdf-btn" disabled>PDF डाउनलोड करें</button>
+      </div>
+      <div class="error" id="export-error" hidden></div>
+
+      <h2 style="margin-top:20px">संदर्भ पत्र</h2>
+      <div id="references-list"><p class="spinner">अभी तक कोई पत्र तैयार नहीं किया गया।</p></div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
