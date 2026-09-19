@@ -30,13 +30,22 @@ class OllamaEmbedder(Embedder):
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         vectors = []
-        for text in texts:
+        for i, text in enumerate(texts):
             resp = self._session.post(
                 f"{self._host}/api/embeddings",
                 json={"model": self.model_name, "prompt": text},
                 timeout=_REQUEST_TIMEOUT_SECONDS,
             )
-            resp.raise_for_status()
+            if not resp.ok:
+                # raise_for_status() alone throws away Ollama's response
+                # body, which is where the actual reason lives (e.g. a
+                # JSON {"error": "..."} explaining *why* the model
+                # rejected this input) -- surface it instead of leaving
+                # a bare "500 Internal Server Error" to debug blind.
+                raise RuntimeError(
+                    f"Ollama embeddings request failed (HTTP {resp.status_code}) on "
+                    f"text {i + 1}/{len(texts)} ({len(text)} chars): {resp.text[:1000]!r}"
+                )
             vector = resp.json()["embedding"]
             vectors.append(vector)
         return vectors
