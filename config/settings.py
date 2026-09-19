@@ -21,6 +21,16 @@ class Settings:
 
     embedding_backend: str = _env("EMBEDDING_BACKEND", "ollama")
     embedding_model: str = _env("EMBEDDING_MODEL", "qwen3-embedding:0.6b")
+    # Ollama backend only: Ollama defaults new requests to a 2048-token
+    # context regardless of what the underlying model actually
+    # supports, which a single long real-world letter can exceed (a
+    # 43k-character disciplinary order in this project's own corpus
+    # hit "the input length exceeds the context length" at the
+    # default). qwen3-embedding:0.6b supports much larger contexts, so
+    # this asks Ollama to use more of it; see also
+    # src/embeddings/ollama_embedder.py's truncation safety net for
+    # when even this isn't enough.
+    embedding_num_ctx: int = int(_env("EMBEDDING_NUM_CTX", "8192"))
 
     top_k: int = int(_env("TOP_K", "5"))
 

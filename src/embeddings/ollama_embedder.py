@@ -8,6 +8,8 @@ backend choice.
 """
 from __future__ import annotations
 
+import sys
+
 import requests
 
 from .base import Embedder
@@ -20,20 +22,55 @@ from .base import Embedder
 # just turns a slow-but-working call into a crash.
 _REQUEST_TIMEOUT_SECONDS = 300
 
+# Conservative, deliberately pessimistic chars-per-token estimate for
+# Devanagari text so the truncation safety net below stays inside
+# whatever num_ctx Ollama is actually given, even if the real tokenizer
+# does better than this. Only used to pick a truncation length -- never
+# assumed accurate enough to skip asking Ollama and just trust it.
+_CHARS_PER_TOKEN_ESTIMATE = 2
+
 
 class OllamaEmbedder(Embedder):
-    def __init__(self, model_name: str, host: str, session: requests.Session | None = None):
+    def __init__(
+        self,
+        model_name: str,
+        host: str,
+        num_ctx: int = 8192,
+        session: requests.Session | None = None,
+    ):
         self.model_name = model_name
         self._host = host.rstrip("/")
+        self._num_ctx = num_ctx
+        self._max_chars = num_ctx * _CHARS_PER_TOKEN_ESTIMATE
         self._session = session or requests.Session()
         self._dimension: int | None = None
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         vectors = []
         for i, text in enumerate(texts):
+            if len(text) > self._max_chars:
+                # A letter this long will exceed num_ctx regardless of
+                # the real tokenizer ratio -- truncate rather than let
+                # one oversized letter crash ingestion for every other
+                # letter in the batch. Not silent: this is a real loss
+                # of content for that one letter's embedding, so it's
+                # printed, the same way needs_review flags are.
+                print(
+                    f"WARNING: text {i + 1}/{len(texts)} is {len(text)} chars, "
+                    f"longer than this embedder's ~{self._max_chars}-char safety "
+                    f"limit (num_ctx={self._num_ctx}) -- truncating for embedding "
+                    f"only (the stored/displayed text is unaffected). Consider "
+                    f"raising EMBEDDING_NUM_CTX in .env if this happens often.",
+                    file=sys.stderr,
+                )
+                text = text[: self._max_chars]
             resp = self._session.post(
                 f"{self._host}/api/embeddings",
-                json={"model": self.model_name, "prompt": text},
+                json={
+                    "model": self.model_name,
+                    "prompt": text,
+                    "options": {"num_ctx": self._num_ctx},
+                },
                 timeout=_REQUEST_TIMEOUT_SECONDS,
             )
             if not resp.ok:

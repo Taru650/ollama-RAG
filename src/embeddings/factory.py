@@ -5,11 +5,11 @@ from __future__ import annotations
 from .base import Embedder
 
 
-def build_embedder(backend: str, model_name: str, ollama_host: str = "") -> Embedder:
+def build_embedder(backend: str, model_name: str, ollama_host: str = "", ollama_num_ctx: int = 8192) -> Embedder:
     if backend == "ollama":
         from .ollama_embedder import OllamaEmbedder
 
-        return OllamaEmbedder(model_name=model_name, host=ollama_host)
+        return OllamaEmbedder(model_name=model_name, host=ollama_host, num_ctx=ollama_num_ctx)
     if backend == "sentence_transformers":
         from .sentence_transformers_embedder import SentenceTransformersEmbedder
 

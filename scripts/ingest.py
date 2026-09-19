@@ -58,6 +58,7 @@ def main() -> None:
         backend=settings.embedding_backend,
         model_name=settings.embedding_model,
         ollama_host=settings.ollama_host,
+        ollama_num_ctx=settings.embedding_num_ctx,
     )
     dimension = embedder.dimension()
     print(f"Embedding dimension: {dimension}")
