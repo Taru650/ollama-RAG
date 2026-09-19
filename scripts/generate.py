@@ -99,7 +99,7 @@ def main() -> None:
         extra_facts=parse_facts(args.fact),
     )
 
-    client = OllamaChatClient(host=settings.ollama_host)
+    client = OllamaChatClient(host=settings.ollama_host, timeout=settings.generation_timeout_seconds)
     draft = client.chat(model=settings.ollama_model, messages=messages, temperature=settings.generation_temperature)
 
     print("=" * 70)

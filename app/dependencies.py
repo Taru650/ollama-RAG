@@ -46,7 +46,7 @@ def get_retriever() -> HybridRetriever:
 
 @lru_cache
 def get_ollama_client() -> OllamaChatClient:
-    return OllamaChatClient(host=settings.ollama_host)
+    return OllamaChatClient(host=settings.ollama_host, timeout=settings.generation_timeout_seconds)
 
 
 def reset_caches() -> None:

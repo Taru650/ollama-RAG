@@ -243,9 +243,12 @@ python scripts/generate.py \
 confidence) -- check those with `inspect_letter.py` before trusting
 them in retrieval.
 
-Expect CPU-only generation on this hardware to take tens of seconds
-per letter -- this was not benchmarked from the build sandbox, so
-don't be surprised either way.
+Expect CPU-only generation on 8GB hardware to take a while -- real
+end-to-end testing hit Ollama's default 300s client timeout on a
+single letter, so "tens of seconds" was too optimistic. The client
+timeout defaults to `GENERATION_TIMEOUT_SECONDS=600` (10 minutes) for
+this reason; raise it further in `.env` if you still see a
+`ReadTimeout`.
 
 If `scripts/inspect_letter.py` shows garbled Devanagari for a letter
 from your own corpus, the font-name-to-mapping-table logic in

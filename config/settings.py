@@ -38,6 +38,13 @@ class Settings:
     data_dir: Path = Path(_env("DATA_DIR", "./data/letters"))
 
     generation_temperature: float = float(_env("GENERATION_TEMPERATURE", "0.2"))
+    # Full letter generation is autoregressive (token-by-token), unlike
+    # a single-pass embedding call, and the prompt includes retrieved
+    # reference letters on top of the request itself -- on an 8GB
+    # CPU-only machine (this project's target hardware) this hit
+    # Ollama's default 300s client timeout during real end-to-end
+    # testing. Raise this in .env if generation still times out.
+    generation_timeout_seconds: int = int(_env("GENERATION_TIMEOUT_SECONDS", "600"))
 
     # Export (DOCX/PDF) -- Noto Sans Devanagari is free/open-source and
     # was the font this project's PDF export was actually verified

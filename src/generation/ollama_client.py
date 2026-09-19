@@ -6,8 +6,9 @@ import requests
 
 
 class OllamaChatClient:
-    def __init__(self, host: str, session: requests.Session | None = None):
+    def __init__(self, host: str, timeout: int = 300, session: requests.Session | None = None):
         self._host = host.rstrip("/")
+        self._timeout = timeout
         self._session = session or requests.Session()
 
     def chat(self, model: str, messages: list[dict], temperature: float = 0.2) -> str:
@@ -19,7 +20,7 @@ class OllamaChatClient:
                 "stream": False,
                 "options": {"temperature": temperature},
             },
-            timeout=300,
+            timeout=self._timeout,
         )
         resp.raise_for_status()
         return resp.json()["message"]["content"]
